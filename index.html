@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#263c59">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon-192.png" type="image/png">
+  <title>空模様 | 壁掛け天気ダッシュボード</title>
+  <style>
+    :root { --white:#fff; --line:rgba(255,255,255,.24); --glass:rgba(255,255,255,.145); --shadow:rgba(8,37,72,.12); --text-soft:rgba(255,255,255,.72); --curve:cubic-bezier(.2,.7,.2,1); font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; }
+    *,*::before,*::after {box-sizing:border-box}
+    html,body {margin:0; min-height:100%;background:#3b93d1;color:white;}
+    body {overflow-x:hidden;}
+    button {font:inherit;color:inherit;cursor:pointer}
+    .sky {position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;background:linear-gradient(137deg,#243652,#4d6178)}
+    body[data-scene="clear"] .sky {background:linear-gradient(140deg,#1474ae,#479bc9 58%,#58aeb0)}
+    body[data-scene="cloudy"] .sky {background:linear-gradient(135deg,#43586d,#657b90 54%,#8f9da9)}
+    body[data-scene="rain"] .sky {background:linear-gradient(140deg,#23334f,#365672 55%,#4e6b8b)}
+    body[data-scene="snow"] .sky {background:linear-gradient(140deg,#526c94,#688aa7 57%,#92aebb)}
+    body[data-scene="night"] .sky {background:linear-gradient(130deg,#0d1736,#1d3764 55%,#2b4e77)}
+    .sun-orb {position:absolute;width:36vw;height:36vw;max-width:530px;max-height:530px;top:-24%;right:-6%;border-radius:100%;background:radial-gradient(circle,rgba(255,255,240,.48),rgba(255,245,194,.22) 28%,transparent 72%);opacity:0}
+    .cloud {position:absolute;width:44vw;height:25vh;background:radial-gradient(ellipse,rgba(255,255,255,.18),transparent 68%)}
+    .cloud.one {right:-4%;top:22%}.cloud.two{left:13%;bottom:2%;opacity:.58}
+    .grain{position:absolute;inset:0;opacity:.17;background-image:radial-gradient(rgba(255,255,255,.7) .65px,transparent .7px);background-size:27px 27px;mask-image:linear-gradient(to bottom,transparent 15%,black 100%)}
+    .rain-lines {position:absolute;inset:0;display:none;background:repeating-linear-gradient(110deg,transparent 0,transparent 25px,rgba(184,229,255,.15) 26px,transparent 27px,transparent 53px)}
+    body[data-scene="rain"] .rain-lines {display:block}
+    body[data-scene="clear"] .sun-orb{opacity:1}
+    body[data-scene="cloudy"] .cloud{background:radial-gradient(ellipse,rgba(235,246,255,.27),transparent 68%)}
+    body[data-scene="night"] .grain{opacity:.45;background-size:39px 39px;mask-image:linear-gradient(to top,transparent 6%,black)}
+    .dashboard {position:relative;z-index:1;max-width:1540px;margin:0 auto;padding:28px clamp(18px,3.3vw,46px) 20px;min-height:100dvh;display:flex;flex-direction:column;gap:17px}
+    header{display:flex;justify-content:space-between;align-items:center;min-height:68px;gap:15px}
+    .brand {display:flex;align-items:center;gap:13px;min-width:0}
+    .brand-mark {width:46px;height:46px;border-radius:14px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.21);display:grid;place-items:center;box-shadow:0 8px 24px rgba(0,0,0,.04)}
+    .brand-mark svg{width:27px;height:27px}
+    .brand-name {font-size:23px;font-weight:780;letter-spacing:.12em;line-height:1.05}
+    .brand-sub{margin-top:5px;font-size:11px;letter-spacing:.13em;color:var(--text-soft);font-weight:650}
+    .header-right {display:flex;align-items:center;gap:21px;justify-content:flex-end}
+    .location-btn {border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.16);display:flex;align-items:center;gap:9px;padding:10px 13px;font-size:13px;font-weight:650;white-space:nowrap;min-width:0}
+    #location-label{max-width:22vw;overflow:hidden;text-overflow:ellipsis}
+    .location-btn:hover,.mode-btn:hover,.hour-buttons button:hover {background:rgba(255,255,255,.29)}
+    .location-btn svg {width:17px;height:17px}
+    .clock-block{text-align:right;line-height:1.14;min-width:100px}
+    #clock {font-size:31px;font-weight:680;font-variant-numeric:tabular-nums;letter-spacing:-.05em}
+    #date {margin-top:3px;font-size:11px;letter-spacing:.05em;color:rgba(255,255,255,.82)}
+    .mode-btn {background:rgba(0,29,56,.17);border:1px solid var(--line);border-radius:999px;padding:11px 14px;font-size:11px;min-width:119px;white-space:nowrap}
+    .info-line {display:flex;align-items:center;justify-content:space-between;gap:9px;min-height:20px;margin-top:-2px}
+    .info-status {display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.04em;color:rgba(255,255,255,.88)}
+    .status-dot {height:7px;width:7px;display:inline-block;border-radius:50%;background:#ffe297;box-shadow:0 0 0 4px rgba(255,255,255,.1)}
+    .info-tip {font-size:11px;color:rgba(255,255,255,.9);white-space:nowrap}
+    .main-grid {display:grid;grid-template-columns:minmax(0,1.09fr) minmax(0,.91fr);gap:17px;height:365px;min-height:365px}
+    .panel {background:var(--glass);border:1px solid var(--line);box-shadow:0 18px 38px var(--shadow);border-radius:26px;overflow:hidden}
+    .hero {padding:25px 30px 21px;display:flex;flex-direction:column;justify-content:space-between;position:relative}
+    .eyebrow {font-size:11px;letter-spacing:.2em;font-weight:740;color:rgba(255,255,255,.77)}
+    .hero-center {display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:0;flex:1}
+    .weather-title {font-size:25px;font-weight:720;letter-spacing:.03em;margin-bottom:3px}
+    .temperature {display:flex;align-items:start;font-weight:350;line-height:1;letter-spacing:-.075em}
+    .temperature .figure {font-size:clamp(86px,9vw,130px);font-variant-numeric:tabular-nums;font-weight:380}
+    .temperature .degree {font-size:37px;margin-top:12px;margin-left:8px;font-weight:350;letter-spacing:0}
+    .range {font-size:13px;color:rgba(255,255,255,.9);margin-top:9px;letter-spacing:.02em;display:flex;gap:14px}
+    .range b{font-weight:700}
+    .hero-art {width:clamp(115px,16vw,230px);max-width:44%;filter:drop-shadow(0 20px 19px rgba(9,52,78,.15));transform:translate(3%,4%)}
+    .hero-art svg{width:100%;height:auto}
+    .metrics {border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding-top:16px;gap:7px}
+    .metric {min-width:0;display:flex;align-items:center;gap:11px;padding:4px 2px}
+    .metric-ico {border-radius:12px;height:39px;width:39px;display:grid;place-items:center;background:rgba(255,255,255,.14);flex:0 0 39px}
+    .metric-ico svg{width:20px;height:20px}
+    .metric-caption{font-size:11px;color:var(--text-soft);margin-bottom:4px;font-weight:600;white-space:nowrap}
+    .metric-value{font-size:20px;line-height:1;font-weight:680;font-variant-numeric:tabular-nums;letter-spacing:-.025em}
+    .hour-panel {display:flex;flex-direction:column;padding:23px 24px 16px;gap:8px}
+    .section-heading {display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .section-heading h2{margin:0;font-size:18px;letter-spacing:.025em;font-weight:720}
+    .section-heading small{font-size:11px;color:var(--text-soft);letter-spacing:.04em}
+    #temp-chart {height:134px;min-height:134px;width:100%;display:block;overflow:visible;margin:8px 0 1px}
+    .hour-list-wrap{position:relative;min-height:106px;flex:1;display:flex;align-items:end}
+    .hours-scroll {display:flex;gap:4px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;width:100%;padding:1px 0 7px;scroll-behavior:smooth;overscroll-behavior-x:contain}
+    .hours-scroll::-webkit-scrollbar{display:none}
+    .hour-item{min-width:70px;flex:0 0 70px;display:flex;flex-direction:column;align-items:center;gap:8px;border-radius:14px;padding:10px 6px;background:transparent;scroll-snap-align:start}
+    .hour-item:first-child {background:rgba(255,255,255,.16)}
+    .hour-time{font-size:11px;color:rgba(255,255,255,.86);font-weight:660}
+    .hour-item svg {width:29px;height:29px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.07))}
+    .hour-temp{font-size:13px;font-weight:760}
+    .hour-pop{font-size:10px;color:rgba(255,255,255,.83)}
+    .hour-buttons {display:flex;gap:5px}
+    .hour-buttons button{border:1px solid var(--line);background:rgba(255,255,255,.12);border-radius:50%;width:27px;height:27px;display:grid;place-items:center;padding:0}
+    .hour-buttons button svg{width:14px;height:14px}
+    .week-panel {padding:22px 24px 18px;min-height:187px}
+    .week-head {margin-bottom:16px}
+    .week-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+    .day {text-align:center;border-radius:15px;padding:10px 7px 11px;min-width:0;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.07)}
+    .day.today{background:rgba(255,255,255,.20);border-color:rgba(255,255,255,.22)}
+    .day-name {font-size:12px;font-weight:750;letter-spacing:.03em;white-space:nowrap}
+    .day svg{width:32px;height:32px;display:block;margin:10px auto 8px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.06))}
+    .day-temps {font-size:13px;font-weight:740;white-space:nowrap;font-variant-numeric:tabular-nums}
+    .day-temps span{font-size:11px;font-weight:550;color:rgba(255,255,255,.67)}
+    .day-pop {font-size:11px;margin-top:6px;color:rgba(255,255,255,.8)}
+    .bottom {display:flex;justify-content:space-between;align-items:center;font-size:10px;color:rgba(255,255,255,.7);gap:10px;padding:0 3px;letter-spacing:.02em}
+    .bottom a {color:inherit;text-underline-offset:3px}
+    #sleep-cover{display:none;position:fixed;inset:0;z-index:15;background:#000;color:#d4d8df;align-items:center;justify-content:center;text-align:center;padding:32px;flex-direction:column;gap:12px}
+    #sleep-cover.show{display:flex}
+    .sleep-icon{opacity:.36;margin-bottom:6px}
+    #sleep-cover h2{font-size:25px;margin:0;font-weight:500}
+    #sleep-cover p{font-size:13px;margin:0;color:#87909e}
+    #sleep-cover button{margin-top:26px;border:1px solid #444c59;border-radius:12px;background:#15191e;padding:12px 18px;font-size:12px}
+    html.covered {background:#000}
+    html.covered body {background:#000}
+    html.covered .dashboard,html.covered .sky {display:none}
+    .dialog {color:#fff;background:#243650;border:1px solid #7593ad;border-radius:20px;padding:20px;width:min(460px,calc(100vw - 28px));max-height:calc(100dvh - 28px);box-shadow:0 20px 50px #101b35a0}
+    .dialog::backdrop {background:#0e192cb8}
+    .dialog-head {display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+    .dialog h2 {font-size:19px;margin:0}
+    .dialog button,.footer-button {border:1px solid var(--line);background:#ffffff12;border-radius:9px;padding:7px 11px}
+    .dialog button:hover,.footer-button:hover {background:#ffffff2c}
+    .dialog p {font-size:13px;margin:13px 0 8px}
+    .search-line {display:flex;gap:7px;margin-top:4px}
+    .search-line input {font:inherit;flex:1;min-width:0;border:1px solid #a7b6cf;border-radius:8px;padding:8px;color:#172b46;background:#f3f7ff}
+    .search-line button {white-space:nowrap}
+    .location-results {display:grid;gap:5px}
+    .location-results button {text-align:left}
+    .empty-forecast {color:#fff;font-size:13px}
+    .footer-button {font-size:11px;white-space:nowrap;padding:2px 7px}
+    [hidden] {display:none !important}
+    :focus-visible {outline:2px solid #ffebac;outline-offset:3px}
+    .toast {position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);z-index:20;opacity:0;pointer-events:none;transition:.25s;background:rgba(13,26,46,.88);border:1px solid rgba(255,255,255,.15);padding:11px 18px;border-radius:12px;font-size:12px;max-width:calc(100vw - 32px);text-align:center}
+    .toast.show{opacity:1;transform:translate(-50%,0)}
+    @media(min-width:1450px) { .dashboard{padding-top:42px;gap:21px}.main-grid{height:430px;min-height:430px}.week-panel{min-height:198px}.hero{padding:35px}.hour-panel{padding:31px 29px 17px} #temp-chart{height:175px}.hour-list-wrap{min-height:150px} }
+    @media(max-width:980px) { .dashboard {padding:16px 20px;gap:11px} header{min-height:56px}.main-grid{height:326px;min-height:326px;gap:11px}.panel{border-radius:19px}.hero{padding:18px 20px 14px}.hour-panel{padding:18px 17px 9px}.week-panel{padding:17px 17px 13px;min-height:164px}.section-heading h2{font-size:16px}.temperature .figure{font-size:clamp(70px,9vw,100px)}.metric{gap:6px}.metric-ico{height:30px;width:30px;flex-basis:30px}.metric-ico svg{width:17px;height:17px}.metric-value{font-size:17px}.hero-art{max-width:39%}#temp-chart{height:109px;min-height:109px;margin:0}.hour-list-wrap{min-height:129px}.week-head{margin-bottom:9px}.day{padding:7px 4px}.day svg{margin:6px auto;width:27px;height:27px}.brand-name{font-size:19px}.clock-block #clock{font-size:26px}.header-right{gap:10px}.location-btn{padding:8px 11px}.day-temps{font-size:12px}}
+    @media(max-width:680px) { .dashboard{padding:15px;gap:12px}.brand-sub,.info-tip {display:none}.header-right{gap:7px}.brand-mark{height:36px;width:36px;border-radius:11px}.brand-name{font-size:17px}.location-btn{font-size:0;width:35px;height:35px;justify-content:center;padding:5px}.mode-btn{font-size:10px;min-width:0;padding:9px}.clock-block #clock{font-size:22px}.clock-block #date{font-size:9px}.main-grid{grid-template-columns:1fr;height:auto;min-height:0}.hero{min-height:303px}.hour-panel{min-height:310px}.week-panel{overflow-x:auto}.week-grid{min-width:600px}.bottom{flex-wrap:wrap} }
+    @media(max-height:720px) and (min-width:681px) { .dashboard{padding-top:12px;padding-bottom:10px;gap:9px}header{min-height:47px}.info-line{min-height:16px}.main-grid{height:306px;min-height:306px}.week-panel{min-height:155px;padding-top:12px}.day{padding:6px}.day svg{margin:4px auto}.hero{padding-top:14px;padding-bottom:12px}.hour-panel{padding-top:14px}.hour-list-wrap{min-height:117px}#temp-chart{height:102px;min-height:102px} }
+    @media (orientation:landscape) and (min-width:681px) and (max-height:620px) {
+      .dashboard{padding-top:8px;padding-bottom:8px;gap:7px}
+      header{min-height:45px}
+      .main-grid{height:clamp(214px,calc(100dvh - 269px),306px);min-height:0}
+      .hero{padding-top:11px;padding-bottom:9px}
+      .hero-art{width:clamp(100px,15vw,167px);max-height:135px}
+      .hero-art svg{max-height:135px}
+      .temperature .figure{font-size:clamp(57px, min(12vh, 9vw), 100px)}
+      .weather-title{font-size:19px}
+      .range{margin-top:4px}
+      .metrics{padding-top:7px}
+      .metric-caption{margin-bottom:2px}
+      .hour-panel{padding-top:9px;padding-bottom:7px;gap:4px}
+      #temp-chart{height:clamp(54px,calc(100dvh - 454px),102px);min-height:0;margin:2px 0}
+      .hour-list-wrap{min-height:0}
+      .hour-item{gap:5px;padding:6px 5px}
+      .week-panel{min-height:0;padding:9px 14px}
+      .week-head{margin-bottom:7px}
+      .day svg{width:23px;height:23px;margin:4px auto}
+      .day-pop{margin-top:4px}
+    }
+    @media (max-width:680px) {
+      .info-tip {display:block;font-size:10px}
+      .brand{gap:6px}
+      .brand-name>span {display:none}
+      .info-line{align-items:flex-start}
+    }
+    @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;scroll-behavior:auto!important}}
+  </style>
+</head>
+<body data-scene="unknown">
+<div class="sky" aria-hidden="true"><div class="sun-orb"></div><div class="cloud one"></div><div class="cloud two"></div><div class="rain-lines"></div><div class="grain"></div></div>
+<div class="dashboard">
+  <header>
+    <div class="brand">
+      <div class="brand-mark"><svg viewBox="0 0 28 28" fill="none"><circle cx="11" cy="10" r="5.3" fill="#FFE6A1"/><path d="M9 21.5h12a4.5 4.5 0 000-9 6.5 6.5 0 00-12.3 1.7A3.7 3.7 0 009 21.5Z" fill="white" opacity=".94"/></svg></div>
+      <div><div class="brand-name">空模様<span style="font-weight:390;opacity:.65;margin-left:7px;font-size:14px;letter-spacing:0">SORA</span></div><div class="brand-sub">YOUR DAILY WEATHER</div></div>
+    </div>
+    <div class="header-right">
+      <button class="location-btn" type="button" id="locate-btn" title="現在地・地域を設定" aria-label="現在地・地域を設定" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 21s7-6.2 7-12a7 7 0 10-14 0c0 5.8 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg><span id="location-label">現在地を取得</span></button>
+      <div class="clock-block"><div id="clock">--:--</div><div id="date">--月--日</div></div>
+      <button class="mode-btn" type="button" id="mode-btn" aria-label="09:00～翌07:00の自動消灯" title="09:00～翌07:00の黒画面設定" aria-pressed="true">自動消灯 ON</button>
+    </div>
+  </header>
+  <div class="info-line"><div class="info-status" role="status"><span class="status-dot" id="status-dot" aria-hidden="true"></span><span id="status-label">現在地の取得待ち</span></div><div class="info-tip" id="updated-label">最終更新 —</div></div>
+  <div class="main-grid">
+    <section class="panel hero" aria-label="現在の天気">
+      <div class="eyebrow" id="hero-eyebrow">現在の天気</div>
+      <div class="hero-center">
+        <div>
+          <div class="weather-title" id="weather-desc">天気データ未取得</div>
+          <div class="temperature"><span class="figure" id="current-temp">—</span><span class="degree">°C</span></div>
+          <div class="range"><div>最高 <b id="high-temp">—</b></div><div>最低 <b id="low-temp">—</b></div></div>
+        </div>
+        <div class="hero-art" id="hero-icon"></div>
+      </div>
+      <div class="metrics">
+        <div class="metric"><div class="metric-ico"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round"><path d="M12 3C9 7 5.5 11.2 5.5 15a6.5 6.5 0 0013 0C18.5 11.2 15 7 12 3Z"/><path d="M9 17a3 3 0 003 3"/></svg></div><div><div class="metric-caption">降水確率</div><div class="metric-value" id="rain-value">—</div></div></div>
+        <div class="metric"><div class="metric-ico"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round"><path d="M12 3C9 7 6 10.8 6 14.5a6 6 0 0012 0C18 10.8 15 7 12 3Z"/><path d="M9 15l2 2 4-5"/></svg></div><div><div class="metric-caption">湿度</div><div class="metric-value" id="humidity-value">—</div></div></div>
+        <div class="metric"><div class="metric-ico"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round"><path d="M9 14V5a3 3 0 016 0v9a5 5 0 11-6 0Z"/><path d="M12 8v10"/><circle cx="12" cy="18" r="1.1" fill="white" stroke="none"/></svg></div><div><div class="metric-caption">体感温度</div><div class="metric-value" id="feels-value">—</div></div></div>
+      </div>
+    </section>
+    <section class="panel hour-panel" aria-label="24時間の予報">
+      <div class="section-heading"><h2>これから24時間</h2><small>気温の推移 / 降水確率</small></div>
+      <svg id="temp-chart" viewBox="0 0 520 140" preserveAspectRatio="none" role="img" aria-label="24時間の気温グラフ" hidden></svg>
+      <p id="hour-empty" class="empty-forecast">予報を取得すると表示します。</p>
+      <div class="hour-list-wrap" id="hour-list-wrap" hidden><div class="hours-scroll" id="hours-scroll" tabindex="0" aria-label="24時間の予報。横スクロールできます"></div></div>
+      <div id="hour-controls" hidden style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:-5px"><small style="font-size:10px;opacity:.7">左右にスワイプして24時間分を見る</small><div class="hour-buttons"><button type="button" id="hour-prev" aria-label="前の時間へ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m14 5-7 7 7 7"/></svg></button><button type="button" id="hour-next" aria-label="次の時間へ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10 5 7 7-7 7"/></svg></button></div></div>
+    </section>
+  </div>
+  <section class="panel week-panel" aria-label="7日間の予報">
+    <div class="section-heading week-head"><h2>週間天気予報</h2><small>この先7日間</small></div>
+    <p id="week-empty" class="empty-forecast">予報を取得すると表示します。</p>
+    <div class="week-grid" id="week-grid"></div>
+  </section>
+  <div class="bottom"><div><button class="footer-button" type="button" id="fullscreen-btn" hidden>全画面</button> <span id="footer-note"></span></div><div>天気データ提供：<a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a> ｜ 15分ごとに自動更新</div></div>
+</div>
+<div id="sleep-cover" aria-hidden="true"><svg class="sleep-icon" width="55" height="55" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M20.8 15.9A9 9 0 018.1 3.2 9 9 0 1020.8 15.9Z"/></svg><h2>おやすみモード</h2><p>09:00〜翌07:00 は表示を暗くしています</p><button type="button" id="exit-sleep">一時表示（10分）</button></div>
+<dialog class="dialog" id="location-dialog" aria-labelledby="location-heading">
+  <div class="dialog-head">
+    <h2 id="location-heading">現在地・地域を設定</h2>
+    <form method="dialog"><button type="submit">閉じる</button></form>
+  </div>
+  <button type="button" id="retry-location">現在地を取得</button>
+  <p>測位できない場合は、地域名を検索して選択してください。</p>
+  <form id="place-search">
+    <label for="place-query">地域名</label>
+    <div class="search-line">
+      <input id="place-query" type="search" minlength="2" maxlength="80" required placeholder="例：横浜市 / Yokohama">
+      <button type="submit">地域を検索</button>
+    </div>
+  </form>
+  <p id="place-status" role="status"></p>
+  <div class="location-results" id="place-results"></div>
+</dialog>
+<div class="toast" id="toast" role="status"></div>
+<noscript><p style="position:relative;z-index:2;margin:20px">天気を取得するには、ブラウザで JavaScript を有効にしてください。</p></noscript>
+<script src="./dashboard.js"></script>
+</body>
+</html>
